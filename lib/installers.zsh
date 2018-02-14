@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
 libdir=${0:a:h}
+
 source $libdir/terminal.zsh
 source $libdir/homebrew.zsh
 source $libdir/git.zsh
@@ -89,10 +90,9 @@ function install_file() {
 }
 
 function run_installers() {
-  info 'running installers'
-  dotfiles_find install.sh | while read installer ; do run "running ${installer}" "${installer}" ; done
+  dotfiles_find install.sh | while read installer ; do run " - running installer at ${installer}" "${installer}" ; done
 
-  info 'opening files'
+  info ' - opening files'
   OLD_IFS=$IFS
   IFS=''
   for file_source in $(dotfiles_find install.open); do
@@ -105,7 +105,6 @@ function run_installers() {
 }
 
 function run_postinstall() {
-    info 'running post-installers'
     dotfiles_find post-install.sh | while read installer ; do run "running ${installer}" "${installer}" ; done
 }
 
@@ -127,30 +126,35 @@ function dotfiles_install() {
   skip_all=false
 
   # symlinks
+  info ' - symlinks'
   for file_source in $(dotfiles_find \*.symlink); do
     file_dest="$HOME/.`basename \"${file_source%.*}\"`"
     install_file link $file_source $file_dest
   done
 
   # git repositories
+  info ' - git repos'
   for file_source in $(dotfiles_find \*.gitrepo); do
     file_dest="$HOME/.`basename \"${file_source%.*}\"`"
     install_file git $file_source $file_dest
   done
 
   # preferences
+  info ' - preferences'
   for file_source in $(dotfiles_find \*.plist); do
     file_dest="$HOME/Library/Preferences/`basename $file_source`"
     install_file copy $file_source $file_dest
   done
 
   # fonts
+  info ' - fonts'
   for file_source in $(dotfiles_find \*.otf -or -name \*.ttf -or -name \*.ttc); do
     file_dest="$HOME/Library/Fonts/$(basename $file_source)"
     install_file copy $file_source $file_dest
   done
 
   # launch agents
+  info ' - launch agents'
   for file_source in $(dotfiles_find \*.launchagent); do
     file_dest="$HOME/Library/LaunchAgents/$(basename $file_source | sed 's/.launchagent//')"
     install_file copy $file_source $file_dest
@@ -169,9 +173,13 @@ function main() {
   else
     info 'installing dotfiles'
     dotfiles_install
+    info 'running installers'
     run_installers
+    info 'installing brew formulas'
     brew_install_formulas
+    info 'running post-install'
     run_postinstall
+    info 'running create localrc'
     create_localrc
   fi
 

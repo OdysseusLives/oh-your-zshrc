@@ -3,6 +3,7 @@ brew_installed=""
 function brew_install_formulas() {
   brew_installed=$(brew cask ls --versions 2> /dev/null)
   for file in `dotfiles_find install.homebrew-cask`; do
+    info " - using file $file"
     for formula in `cat $file`; do
       brew_install $formula cask
     done
@@ -10,6 +11,7 @@ function brew_install_formulas() {
 
   brew_installed=$(brew ls --versions 2> /dev/null)
   for file in `dotfiles_find install.homebrew`; do
+    info " - using file $file"
     for formula in `cat $file`; do
       brew_install $formula
     done
@@ -35,6 +37,8 @@ function brew_install() {
     else
       fail "failed to install $formula"
     fi
+  else
+    success "$formula already installed"
   fi
 }
 
