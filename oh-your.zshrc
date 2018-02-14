@@ -20,7 +20,8 @@ function realpath() {
 }
 
 # oh-your-zshrc location
-ZSHRC=$(dirname $(realpath $(echo ${(%):-%x})))
+# ZSHRC=$(dirname $(realpath $(echo ${(%):-%x})))
+ZSHRC=~/oh-your-zshrc
 
 # dotfiles location
 export DOTFILES=$HOME/.dotfiles
@@ -68,15 +69,16 @@ DEFAULT_USER=$(whoami)
 
 # configure theme(s)
 ZSH_THEME="agnoster"
+# ZSH_THEME="robbyrussell"
 
 # configure plugins
-plugins=("${(@f)$(
-# define oh-my-zsh plugins implicitly based on topics
-find $DOTFILES $DOTFILES/local/ -not -name '.git' -d 1 -type d -exec basename {} \;
+#plugins=("${(@f)$(
+## define oh-my-zsh plugins implicitly based on topics
+#find $DOTFILES $DOTFILES/local/ -not -name '.git' -d 1 -type d -exec basename {} \;
 
-# add any plugins defined by files
-find -L $DOTFILES -name oh-my-zsh.plugins -d 2 -exec cat {} \;
-)}")
+## add any plugins defined by files
+#find -L $DOTFILES -name oh-my-zsh.plugins -d 2 -exec cat {} \;
+#)}")
 
 for file in ${(M)config_files:#*/oh-my-zsh.zsh}
 do
