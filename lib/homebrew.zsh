@@ -33,12 +33,12 @@ function brew_install() {
   formula=$1
   if ! echo $brew_installed | grep -q $formula; then
     if brew $2 install $formula > /dev/null 2>&1; then
-      success "installed $formula"
+      success "   - installed $formula"
     else
-      fail "failed to install $formula"
+      fail "   - failed to install $formula"
     fi
   else
-    success "$formula already installed"
+    info "   - $formula already installed"
   fi
 }
 

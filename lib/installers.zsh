@@ -70,18 +70,18 @@ function install_file() {
 
     if [ "$overwrite" = "true" ] || [ "$overwrite_all" = "true" ]; then
       rm -rf $file_dest
-      success "removed $file_dest"
+      success "  - removed $file_dest"
     fi
 
     if [ "$backup" = "true" ] || [ "$backup_all" = "true" ]; then
       mv $file_dest $file_dest\.backup
-      success "moved $file_dest to $file_dest.backup"
+      success "  - moved $file_dest to $file_dest.backup"
     fi
 
     if [ "$skip" = "false" ] && [ "$skip_all" = "false" ]; then
       link_files $file_type $file_source $file_dest
     else
-      success "skipped $file_source"
+      info "  - skipped $file_source"
     fi
 
   else
