@@ -1,4 +1,12 @@
-git_clone () {
+git_clone_or_pull() {
+  if [ -d $2 ]; then
+    git_pull $2
+  else
+    git_clone $1 $2
+  fi
+}
+
+git_clone() {
   repo=$(head -n 1 $1)
   dest=$2
   if ! git clone --quiet $repo $dest; then
@@ -20,19 +28,11 @@ git_clone () {
   done
 }
 
-function git_pull_repos() {
-  for file in $(dotfiles_find \*.gitrepo); do
-    repo="$HOME/.`basename \"${file%.*}\"`"
-    git_pull $repo &
-  done
-  wait
-}
-
 function git_pull() {
   pushd $1 > /dev/null
-  if ! git pull --rebase --quiet origin master; then
+  if ! git pull origin master --rebase --quiet; then
     fail "could not update $repo"
   fi
-  success "updated $repo"
+  success "updated $1"
   popd >> /dev/null
 }

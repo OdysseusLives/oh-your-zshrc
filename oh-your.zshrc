@@ -19,29 +19,13 @@ function realpath() {
   echo "$REALPATH"
 }
 
-# oh-your-zshrc location
-# ZSHRC=$(dirname $(realpath $(echo ${(%):-%x})))
-ZSHRC=~/oh-your-zshrc
-
-# dotfiles location
-export DOTFILES=$HOME/.dotfiles
-
-# install/update/reload
-function dotfiles_install() {
-  $ZSHRC/lib/installers.zsh
-}
-
-function dotfiles_update() {
-  $ZSHRC/lib/installers.zsh update
-}
-
-function dotfiles_reload() {
-  source $HOME/.zshrc
-}
+# oh-your-zshrc
+export ZSHRC=$(dirname $(realpath $(echo ${(%):-%x})))
+source "$ZSHRC/lib/dotfiles.zsh"
 
 # find all zsh files
 typeset -U config_files
-config_files=($(find -L "$DOTFILES" -name \*.zsh))
+config_files=($(dotfiles_find \*.zsh))
 
 # use .localrc for things that need to be kept secret
 if [[ -a $HOME/.localrc ]]
@@ -49,43 +33,38 @@ then
   source $HOME/.localrc
 fi
 
-## configure and load oh-my-zsh ##
-
 ZSH=$ZSHRC/oh-my-zsh
 if [ ! -d "$ZSH" ]; then
   if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    echo "oh-my-zsh is not installed"
-    # TODO install if necessary
+    echo "oh-my-zsh is not installed, run dotfiles_install"
+    return
   else
     ZSH="$HOME/.oh-my-zsh"
   fi
 fi
 
-# disable update, we handle that
-DISABLE_AUTO_UPDATE="true"
-
-# set default user
 DEFAULT_USER=$(whoami)
-
-# configure theme(s)
+DISABLE_AUTO_UPDATE="true"
 ZSH_THEME="agnoster"
-# ZSH_THEME="robbyrussell"
 
 # configure plugins
-#plugins=("${(@f)$(
-## define oh-my-zsh plugins implicitly based on topics
-#find $DOTFILES $DOTFILES/local/ -not -name '.git' -d 1 -type d -exec basename {} \;
+plugins=("${(@f)$(
+find $(dotfiles) -not -name '.git' -d 1 -type d -exec basename {} \;
 
-## add any plugins defined by files
-#find -L $DOTFILES -name oh-my-zsh.plugins -d 2 -exec cat {} \;
-#)}")
+find $(dotfiles) -name oh-my-zsh.plugins -d 2 -exec cat {} \;
+)}")
 
 for file in ${(M)config_files:#*/oh-my-zsh.zsh}
 do
   source $file
 done
 
-source $ZSH/oh-my-zsh.sh
+OH_MY_ZSH="$ZSH/oh-my-zsh.sh"
+
+if [[ -a "$OH_MY_ZSH" ]]
+then
+  source "$OH_MY_ZSH"
+fi
 
 ## load dotfiles ##
 
@@ -100,7 +79,10 @@ BREW=/usr/local/bin:/usr/local/sbin
 export PATH=$BREW:$PATH
 
 # put the bin/ directories first on the path
-export PATH=$DOTFILES/bin:$DOTFILES/local/bin:$PATH
+for d in $(dotfiles)
+do
+  export PATH=$d/bin:$PATH
+done
 
 # load everything else
 for file in ${${${config_files:#*/path.zsh}:#*/completion.zsh}:#*/oh-my-zsh.zsh}

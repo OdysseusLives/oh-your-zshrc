@@ -1,8 +1,9 @@
 #!/usr/bin/env zsh
 libdir=${0:a:h}
-
+source $libdir/dotfiles.zsh
 source $libdir/terminal.zsh
 source $libdir/homebrew.zsh
+source $libdir/mas.zsh
 source $libdir/git.zsh
 
 function link_files() {
@@ -14,7 +15,7 @@ function link_files() {
       copy_file $2 $3
       ;;
     git )
-      git_clone $2 $3
+      git_clone_or_pull $2 $3
       ;;
     * )
       fail "Unknown link type: $1"
@@ -23,11 +24,12 @@ function link_files() {
 }
 
 function link_file() {
-  ln -s $1 $2
+  ln -s -f $1 $2
   success "linked $1 to $2"
 }
 
 function copy_file() {
+  mkdir -p $(dirname $2)
   cp $1 $2
   success "copied $1 to $2"
 }
@@ -46,7 +48,7 @@ function install_file() {
     backup=false
     skip=false
 
-    if [ "$overwrite_all" = "false" ] && [ "$backup_all" = "false" ] && [ "$skip_all" = "false" ]; then
+    if [ "$overwrite_all" = "false" ] && [ "$backup_all" = "false" ] && [ "$skip_all" = "false" ] && [ "$skip_all_silent" = "false" ] && [ "$force_all" = "false" ]; then
       user "File already exists: `basename $file_dest`, what do you want to do? [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all?"
       read -r action
 
@@ -69,43 +71,49 @@ function install_file() {
     fi
 
     if [ "$overwrite" = "true" ] || [ "$overwrite_all" = "true" ]; then
-      rm -rf $file_dest
-      success "  - removed $file_dest"
+      rm -rf "$file_dest"
+      success "removed $file_dest"
+      link_files $file_type $file_source $file_dest
     fi
 
     if [ "$backup" = "true" ] || [ "$backup_all" = "true" ]; then
       mv $file_dest $file_dest\.backup
-      success "  - moved $file_dest to $file_dest.backup"
-    fi
-
-    if [ "$skip" = "false" ] && [ "$skip_all" = "false" ]; then
+      success "moved $file_dest to $file_dest.backup"
       link_files $file_type $file_source $file_dest
-    else
-      info "  - skipped $file_source"
     fi
 
+    if [[ "$force_all" = "true" ]] || [[ "$skip" = "false" && "$skip_all" = "false" && "$skip_all_silent" = "false" ]]; then
+      link_files $file_type $file_source $file_dest
+    elif [ "$skip_all_silent" = "false" ]; then
+      success "skipped $file_source"
+    fi
   else
     link_files $file_type $file_source $file_dest
   fi
 }
 
 function run_installers() {
-  dotfiles_find install.sh | while read installer ; do run " - running installer at ${installer}" "${installer}" ; done
+  brew_install_upgrade_formulas
+  mas_install_upgrade_formulas
 
-  info ' - opening files'
-  OLD_IFS=$IFS
-  IFS=''
+  info 'running installers'
+  dotfiles_find install.sh | while read installer ; do run "running ${installer}" "${installer}" ; done
+
+  info 'opening files'
   for file_source in $(dotfiles_find install.open); do
+    OLD_IFS=$IFS
+    IFS=$'\n'
+    basedir="$(dirname $file_source)"
     for file in `cat $file_source`; do
-      expanded_file=$(eval echo $file)
-      open_file $expanded_file
+      canonical_file="$basedir/$file"
+      open_file "$canonical_file"
     done
+    IFS=$OLD_IFS
   done
-  IFS=$OLD_IFS
 }
 
 function run_postinstall() {
-    dotfiles_find post-install.sh | while read installer ; do run "running ${installer}" "${installer}" ; done
+  dotfiles_find post-install.sh | while read installer ; do run "running ${installer}" "${installer}" ; done
 }
 
 function create_localrc() {
@@ -116,74 +124,80 @@ function create_localrc() {
   fi
 }
 
-function dotfiles_find() {
-    find -L "$DOTFILES" -maxdepth 3 -name "$1"
-}
-
 function dotfiles_install() {
   overwrite_all=false
   backup_all=false
   skip_all=false
+  force_all=true
+
+  # git repositories
+  force_all=true
+  for file_source in $(dotfiles_find \*.gitrepo); do
+    file_dest="$HOME/.`basename \"${file_source%.*}\"`"
+    install_file git $file_source $file_dest
+  done
+  force_all=false
+
+  # dotfiles can be in nested gitrepo files, so we continue until no destinations remain
+  while true; do
+    had_missing=false
+    for file_source in $(dotfiles_find \*.gitrepo); do
+      file_dest="$HOME/.`basename \"${file_source%.*}\"`"
+      if [ ! -d "$file_dest" ]; then
+        had_missing=true
+        install_file git $file_source $file_dest
+      fi
+    done
+    if [ "$had_missing" = "false" ]; then
+      break
+    fi
+  done
 
   # symlinks
-  info ' - symlinks'
   for file_source in $(dotfiles_find \*.symlink); do
     file_dest="$HOME/.`basename \"${file_source%.*}\"`"
     install_file link $file_source $file_dest
   done
 
-  # git repositories
-  info ' - git repos'
-  for file_source in $(dotfiles_find \*.gitrepo); do
-    file_dest="$HOME/.`basename \"${file_source%.*}\"`"
-    install_file git $file_source $file_dest
-  done
-
   # preferences
-  info ' - preferences'
   for file_source in $(dotfiles_find \*.plist); do
     file_dest="$HOME/Library/Preferences/`basename $file_source`"
     install_file copy $file_source $file_dest
   done
 
   # fonts
-  info ' - fonts'
   for file_source in $(dotfiles_find \*.otf -or -name \*.ttf -or -name \*.ttc); do
     file_dest="$HOME/Library/Fonts/$(basename $file_source)"
     install_file copy $file_source $file_dest
   done
 
   # launch agents
-  info ' - launch agents'
   for file_source in $(dotfiles_find \*.launchagent); do
     file_dest="$HOME/Library/LaunchAgents/$(basename $file_source | sed 's/.launchagent//')"
     install_file copy $file_source $file_dest
   done
 }
 
+function install() {
+    dotfiles_install
+    run_installers
+    run_postinstall
+    create_localrc
+}
+
 function main() {
+  skip_all_silent=false
   if [ "$1" = "update" ]; then
     info 'updating dotfiles'
-    brew_update &
-    git_pull_repos
-    wait
-    brew_upgrade_formulas
-    brew_install_formulas
-    run_postinstall
+    skip_all_silent=true
+    install
+    info 'complete! run dotfiles_reload or restart your session for environment changes to take effect'
   else
     info 'installing dotfiles'
-    dotfiles_install
-    info 'running installers'
-    run_installers
-    info 'installing brew formulas'
-    brew_install_formulas
-    info 'running post-install'
-    run_postinstall
-    info 'running create localrc'
-    create_localrc
+    install
+    info 'complete! use dotfiles_update to keep up to date. run dotfiles_reload or restart your session for environment changes to take effect'
   fi
 
-  info 'complete!'
   echo ''
 }
 
